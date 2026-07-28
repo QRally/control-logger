@@ -2,37 +2,124 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Rally Control Logger</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { background: #000; color: #f00; font-family: monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none; 
+      -webkit-user-select: none;
+    }
     
-    #camera-container { position: relative; flex: 1; width: 100%; background: #111; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-    video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+    /* Fix for mobile browser navigation bars trimming the bottom button */
+    html, body { 
+      background: #000; 
+      color: #f00; 
+      font-family: monospace; 
+      overflow: hidden; 
+      height: 100dvh; 
+      width: 100vw;
+      display: flex; 
+      flex-direction: column; 
+    }
     
+    #camera-container { 
+      position: relative; 
+      flex: 1; 
+      width: 100%; 
+      background: #111; 
+      overflow: hidden; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 0; /* Prevents flex overflow */
+    }
+    
+    video { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+    }
+    
+    /* Startup Button for strict browser privacy models */
     #cam-init-btn { 
-      position: absolute; z-index: 20; color: #fff; background: #900; 
-      padding: 15px 25px; border: 2px solid #f00; font-size: 1.2rem; font-weight: bold;
-      border-radius: 8px; cursor: pointer; text-align: center;
+      position: absolute; 
+      z-index: 20; 
+      color: #fff; 
+      background: #900; 
+      padding: 16px 28px; 
+      border: 2px solid #f00; 
+      font-size: 1.2rem; 
+      font-weight: bold;
+      border-radius: 8px; 
+      cursor: pointer; 
+      text-align: center;
+      box-shadow: 0 0 15px rgba(255,0,0,0.5);
     }
 
-    /* Centralized HUD Bar */
+    /* Centralized HUD Overlay */
     .hud {
-      position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 5;
-      background: rgba(0, 0, 0, 0.85); border: 2px solid #00FF00; border-radius: 8px;
-      padding: 12px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      box-shadow: 0 0 12px rgba(0,0,0,0.9); width: 90%; max-width: 420px;
+      position: absolute; 
+      top: 15px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      z-index: 5;
+      background: rgba(0, 0, 0, 0.85); 
+      border: 2px solid #00FF00; 
+      border-radius: 10px;
+      padding: 10px 20px; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(0,0,0,0.9); 
+      width: 90%; 
+      max-width: 420px;
     }
     
-    #time-display { font-size: 3rem; font-weight: bold; color: #00FF00; text-shadow: 0 0 8px #00FF00; letter-spacing: 2px; }
-    #hud-label { font-size: 0.85rem; color: #AAA; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
+    #time-display { 
+      font-size: 3rem; 
+      font-weight: bold; 
+      color: #00FF00; 
+      text-shadow: 0 0 8px #00FF00; 
+      letter-spacing: 2px; 
+      line-height: 1.1;
+    }
     
+    #hud-label { 
+      font-size: 0.85rem; 
+      color: #AAA; 
+      margin-top: 4px; 
+      letter-spacing: 1px; 
+      text-transform: uppercase; 
+    }
+    
+    /* Full-width capture button anchored safely at the bottom */
     #capture-btn {
-      height: 120px; background: #900; color: #fff; font-size: 2rem; font-weight: bold;
-      border: none; border-top: 3px solid #f00; width: 100%; z-index: 5;
+      height: 100px; 
+      background: #900; 
+      color: #fff; 
+      font-size: 2rem; 
+      font-weight: bold;
+      border: none; 
+      border-top: 3px solid #f00; 
+      width: 100%; 
+      z-index: 10;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: env(safe-area-inset-bottom); /* Accommodates modern gesture bar pads */
     }
-    #capture-btn:active { background: #f00; }
+    
+    #capture-btn:active { 
+      background: #f00; 
+    }
     
     canvas { display: none; }
   </style>
@@ -61,7 +148,7 @@
 
     let currentRallyTime = "00:00:00";
 
-    // Enable Camera
+    // Camera Init with dynamic fallback for strict mobile browser policies
     async function startCamera() {
       initBtn.textContent = "CONNECTING...";
       
@@ -78,16 +165,16 @@
           initBtn.style.display = "none";
           return;
         } catch (err) {
-          console.warn("Camera fallback attempt...", err);
+          console.warn("Camera access attempt failed, trying fallback...", err);
         }
       }
 
-      initBtn.textContent = "CAMERA BLOCKED";
+      initBtn.textContent = "CAMERA BLOCKED - CHECK PERMISSIONS";
     }
 
     initBtn.addEventListener('click', startCamera);
 
-    // High Precision Clock Sync
+    // High Precision Clock Sync Loop
     function updateClock() {
       const now = new Date();
       const hrs = String(now.getHours()).padStart(2, '0');
@@ -105,44 +192,49 @@
         return;
       }
 
-      // Screen flash feedback
+      // Visual feedback trigger
       video.style.opacity = "0.2";
       setTimeout(() => video.style.opacity = "1", 100);
 
+      // Canvas dimensions matched to stream
       canvas.width = video.videoWidth || 1280;
       canvas.height = video.videoHeight || 720;
       const ctx = canvas.getContext('2d');
 
-      // 1. Draw raw video frame
+      // 1. Render base camera frame
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 2. Draw Centralized Overlay Box on top of saved image
-      const boxWidth = Math.min(canvas.width * 0.8, 500);
+      // 2. Render Centralized Graphic Overlay directly onto output image
+      const boxWidth = Math.min(canvas.width * 0.85, 500);
       const boxHeight = 110;
       const boxX = (canvas.width - boxWidth) / 2;
       const boxY = 30;
 
-      // Dark Background
+      // Dark Translucent Background Box
       ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
+      if (ctx.roundRect) {
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
+      } else {
+        ctx.rect(boxX, boxY, boxWidth, boxHeight);
+      }
       ctx.fill();
       ctx.strokeStyle = "#00FF00";
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Centered Green Clock
+      // Centered Green Clock Display
       ctx.fillStyle = "#00FF00";
       ctx.font = "bold 52px monospace";
       ctx.textAlign = "center";
       ctx.fillText(currentRallyTime, canvas.width / 2, boxY + 60);
 
-      // Subtitle Label
+      // Subtitle Text
       ctx.fillStyle = "#AAAAAA";
       ctx.font = "bold 18px monospace";
       ctx.fillText("TC EVIDENCE LOG", canvas.width / 2, boxY + 92);
 
-      // Auto-Download Image
+      // Trigger automatic save to device camera roll / downloads
       const imageURI = canvas.toDataURL("image/jpeg", 0.90);
       const link = document.createElement('a');
       link.download = `TC_${currentRallyTime.replace(/:/g, '-')}.jpg`;
