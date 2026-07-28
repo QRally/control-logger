@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Rally Control Logger</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { background: #000; color: #f00; font-family: monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    
+    #camera-container { position: relative; flex: 1; width: 100%; background: #111; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+    
+    #cam-init-btn { 
+      position: absolute; z-index: 20; color: #fff; background: #900; 
+      padding: 15px 25px; border: 2px solid #f00; font-size: 1.2rem; font-weight: bold;
+      border-radius: 8px; cursor: pointer; text-align: center;
+    }
+
+    /* Centralized HUD Bar */
+    .hud {
+      position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 5;
+      background: rgba(0, 0, 0, 0.85); border: 2px solid #00FF00; border-radius: 8px;
+      padding: 12px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      box-shadow: 0 0 12px rgba(0,0,0,0.9); width: 90%; max-width: 420px;
+    }
+    
+    #time-display { font-size: 3rem; font-weight: bold; color: #00FF00; text-shadow: 0 0 8px #00FF00; letter-spacing: 2px; }
+    #hud-label { font-size: 0.85rem; color: #AAA; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
+    
+    #capture-btn {
+      height: 120px; background: #900; color: #fff; font-size: 2rem; font-weight: bold;
+      border: none; border-top: 3px solid #f00; width: 100%; z-index: 5;
+    }
+    #capture-btn:active { background: #f00; }
+    
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="camera-container">
+    <button id="cam-init-btn">TAP TO ENABLE CAMERA</button>
+    <video id="webcam" autoplay playsinline muted></video>
+    
+    <div class="hud">
+      <div id="time-display">00:00:00</div>
+      <div id="hud-label">TC EVIDENCE LOG</div>
+    </div>
+  </div>
+
+  <button id="capture-btn">LOG CONTROL TIME</button>
+  <canvas id="snapshot"></canvas>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const timeDisplay = document.getElementById('time-display');
+    const captureBtn = document.getElementById('capture-btn');
+    const canvas = document.getElementById('snapshot');
+    const initBtn = document.getElementById('cam-init-btn');
+
+    let currentRallyTime = "00:00:00";
+
+    // Enable Camera
+    async function startCamera() {
+      initBtn.textContent = "CONNECTING...";
+      
+      const constraintsOptions = [
+        { video: { facingMode: "environment" }, audio: false },
+        { video: true, audio: false }
+      ];
+
+      for (let constraints of constraintsOptions) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          await video.play();
+          initBtn.style.display = "none";
+          return;
+        } catch (err) {
+          console.warn("Camera fallback attempt...", err);
+        }
+      }
+
+      initBtn.textContent = "CAMERA BLOCKED";
+    }
+
+    initBtn.addEventListener('click', startCamera);
+
+    // High Precision Clock Sync
+    function updateClock() {
+      const now = new Date();
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const secs = String(now.getSeconds()).padStart(2, '0');
+      currentRallyTime = `${hrs}:${mins}:${secs}`;
+      timeDisplay.textContent = currentRallyTime;
+    }
+    setInterval(updateClock, 100);
+
+    // Capture Trigger & Canvas Overlay
+    captureBtn.addEventListener('click', () => {
+      if (!video.srcObject) {
+        alert("Please enable the camera first!");
+        return;
+      }
+
+      // Screen flash feedback
+      video.style.opacity = "0.2";
+      setTimeout(() => video.style.opacity = "1", 100);
+
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+
+      // 1. Draw raw video frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 2. Draw Centralized Overlay Box on top of saved image
+      const boxWidth = Math.min(canvas.width * 0.8, 500);
+      const boxHeight = 110;
+      const boxX = (canvas.width - boxWidth) / 2;
+      const boxY = 30;
+
+      // Dark Background
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
+      ctx.fill();
+      ctx.strokeStyle = "#00FF00";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Centered Green Clock
+      ctx.fillStyle = "#00FF00";
+      ctx.font = "bold 52px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(currentRallyTime, canvas.width / 2, boxY + 60);
+
+      // Subtitle Label
+      ctx.fillStyle = "#AAAAAA";
+      ctx.font = "bold 18px monospace";
+      ctx.fillText("TC EVIDENCE LOG", canvas.width / 2, boxY + 92);
+
+      // Auto-Download Image
+      const imageURI = canvas.toDataURL("image/jpeg", 0.90);
+      const link = document.createElement('a');
+      link.download = `TC_${currentRallyTime.replace(/:/g, '-')}.jpg`;
+      link.href = imageURI;
+      link.click();
+    });
+  </script>
+</body>
+</html>
